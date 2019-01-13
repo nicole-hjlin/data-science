@@ -1,13 +1,13 @@
 # Visualizing International Education 
 
+_This report is work in progress and your feedback will be highly appreciated. You can contact me at GitHub or by email(nicole.hjlin@gmail.com)_
+
 ---
 
 ## IMPORTANT NOTE
 _report.ipynb_ contains interactive plots that cannot be shown in github browser yet. 
 - Please **click the following link** for the final report that displays all plots properly: [https://nbviewer.jupyter.org/github/nicole-hjlin/exploratory-data-analysis/blob/master/world-bank-international-education/report.ipynb](https://nbviewer.jupyter.org/github/nicole-hjlin/exploratory-data-analysis/blob/master/world-bank-international-education/report.ipynb)
 - Alternatively, pull the whole repo and run the jupyter notebook locally. 
-
-- This report is work in progress and your feedback will be highly appreciated. You can contact me at GitHub or by email(nicole.hjlin@gmail.com)
 
 ---
 
@@ -37,7 +37,7 @@ Besdies for the size of the dataset, many challenges arise when I try to analyze
     
 - **Google BigQuery is not an entirely free service:**
     
-    Only the first 1TB/month is free for each user. Therefore, the size of queries matter. 
+    Only the first 1TB/month is free for each user. Therefore, the size of queries matters. 
     To avoid depleting my free quota, I check the size of each query before I run it to get data. 
     To avoid using the same query more than once, I use pickle to save the results for future processing and visulization.  
        
