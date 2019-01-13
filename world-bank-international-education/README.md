@@ -13,7 +13,7 @@ _report.ipynb_ contains interactive plots that cannot be shown in github browser
 
 ## Introduction and Data Description
 
-This report is created for the following **objective**:
+This report is created with the following **objective**:
 > to explore a _diverse_ set of modern data acqusition, management, processing, visualising, and modelling tools, and apply the appropriate methods on a real world dataset.
 
 With this goal in mind, I chose the [World Bank International Education dataset](https://console.cloud.google.com/marketplace/details/the-world-bank/education) as my main data, which is hosted as a public dataset on [Google BigQuery](https://cloud.google.com/bigquery/). Google BigQuery is a data warehousing service provided by Google Cloud. Datatsets are reshaped into SQL databases and accessed using SQL queries.
