@@ -1,0 +1,36 @@
+{\rtf1\ansi\ansicpg936\cocoartf1504\cocoasubrtf830
+{\fonttbl\f0\fswiss\fcharset0 Helvetica;}
+{\colortbl;\red255\green255\blue255;}
+{\*\expandedcolortbl;;}
+\margl1440\margr1440\vieww10800\viewh8400\viewkind0
+\pard\tx566\tx1133\tx1700\tx2267\tx2834\tx3401\tx3968\tx4535\tx5102\tx5669\tx6236\tx6803\pardirnatural\partightenfactor0
+
+\f0\fs24 \cf0 > rf_tuned_params <- tuneParams(learner = rf_learner, \
++                                task = trainTask, resampling = rf_resample_desc,\
++                                par.set = rf_params, control = rf_control)\
+[Tune] Started tuning learner classif.randomForest for parameter set:\
+        Type len Def  Constr Req Tunable Trafo\
+mtry integer   -   - 3 to 38   -    TRUE     -\
+With control class: TuneControlGrid\
+Imputation value: 1\
+[Tune-x] 1: mtry=3\
+[Tune-y] 1: mmce.test.mean=0.3342833; time: 4.7 min\
+[Tune-x] 2: mtry=7\
+[Tune-y] 2: mmce.test.mean=0.3302731; time: 4.8 min\
+[Tune-x] 3: mtry=11\
+[Tune-y] 3: mmce.test.mean=0.3339665; time: 5.2 min\
+[Tune-x] 4: mtry=15\
+[Tune-y] 4: mmce.test.mean=0.3326302; time: 5.1 min\
+[Tune-x] 5: mtry=19\
+[Tune-y] 5: mmce.test.mean=0.3349165; time: 6.3 min\
+[Tune-x] 6: mtry=22\
+[Tune-y] 6: mmce.test.mean=0.3347408; time: 5.9 min\
+[Tune-x] 7: mtry=26\
+[Tune-y] 7: mmce.test.mean=0.3360423; time: 6.2 min\
+[Tune-x] 8: mtry=30\
+[Tune-y] 8: mmce.test.mean=0.3364995; time: 6.5 min\
+[Tune-x] 9: mtry=34\
+[Tune-y] 9: mmce.test.mean=0.3350923; time: 6.9 min\
+[Tune-x] 10: mtry=38\
+[Tune-y] 10: mmce.test.mean=0.3355497; time: 7.3 min\
+[Tune] Result: mtry=7 : mmce.test.mean=0.3302731}

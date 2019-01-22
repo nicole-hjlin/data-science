@@ -1,0 +1,854 @@
+---
+title: "ST443 Group Project Part I code - Oneline News Popularity Models Evaluation"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+#### ST443 - Machine Learning 
+#### Group Project Part I R codes
+#### Candidate numbers: 22454, 11984, 50771, 13450.
+
+---
+
+### **Content**
+1. **Data Preparation**
+2. **Regression**
+    1. Multiple Linear Regression
+    2. Best Subset Selection
+    3. Ridge Regression 
+    4. Lasso Regression
+    5. Elastic Net
+    6. Ridge Regression with features selected by Lasso
+    7. Regression Trees
+    8. Principle Component Regression
+    9. Partial Least Squares
+3. **Regression Models Evaluation**
+4. **Classification**
+    1. Step Logistic Regression
+    2. K Nearest Neighbors 
+    3. Classification trees with prunning
+    4. Bagging
+    5. Random Forest (with tuning)
+    6. General Gradient Boosting
+    7. Adaptive Boosting
+    8. Extreme Gradient Boosting (with tuning)
+5. **Classification Models Evaluation**
+
+---
+
+### 1. **Data Preparation**
+
+```{r}
+data <- read.csv("OnlineNewsPopularity.csv")
+#str(data)
+#summary(data)
+```
+
+#### Data Removal
+```{r}
+#remove data less than 3 weeks ago
+data <- data[data$timedelta > 21,]
+# remove missing values
+sum(data$n_tokens_content == 0)
+data <- data[data$n_tokens_content != 0,]
+# remove meaningless values (rate of unqiue tokens should not exceed 1)
+sum(data$n_unique_tokens > 1)
+data <- data[data$n_unique_tokens <= 1,]
+# replacing negative values with zeros for keywords' shares (number of shares should not be negative)
+data[data$kw_min_min < 0,]$kw_min_min <- 0
+data[data$kw_avg_min < 0,]$kw_avg_min <- 0
+data[data$kw_min_avg < 0,]$kw_min_avg <- 0
+
+# drop unpredictive columns
+drop_list1 <- c('url','timedelta')
+data <- data[, !colnames(data) %in% drop_list1]
+# drop redundant columns
+drop_list2 <- c('is_weekend','abs_title_subjectivity','abs_title_sentiment_polarity') 
+data <- data[, !colnames(data) %in% drop_list2]
+# drop meaningless columns: n_non_stop_words are 1 for all values
+drop_list3 <- c('n_non_stop_words')
+data <- data[, !colnames(data) %in% drop_list3]
+# drop dependent variables: LDA 
+LDA_list <- c('LDA_00','LDA_01','LDA_02','LDA_03','LDA_04')
+data <- data[, !colnames(data) %in% LDA_list]
+```
+
+#### Factorize categorical variables
+
+```{r}
+# channels
+data$channel <- NA
+data$channel[data$data_channel_is_lifestyle == 1] <- 'lifestyle'
+data$channel[data$data_channel_is_entertainment == 1] <- 'entertainment'
+data$channel[data$data_channel_is_bus == 1] <- 'business'
+data$channel[data$data_channel_is_socmed == 1] <- 'socialMedia'
+data$channel[data$data_channel_is_tech == 1] <- 'tech'
+data$channel[data$data_channel_is_world == 1] <- 'world'
+data$channel[is.na(data$channel)] <- 'others'
+
+data$channel <- as.factor(data$channel)
+drop_list4 <- c('data_channel_is_lifestyle', 
+                'data_channel_is_entertainment', 
+                'data_channel_is_bus', 'data_channel_is_socmed', 
+                'data_channel_is_tech', 
+                'data_channel_is_world')
+data <- data[, !colnames(data) %in% drop_list4]
+
+# days
+data$days <- NA
+data$days[data$weekday_is_monday == 1] <- 'monday'
+data$days[data$weekday_is_tuesday == 1] <- 'tuesday'
+data$days[data$weekday_is_wednesday == 1] <- 'wednesday'
+data$days[data$weekday_is_thursday == 1] <- 'thursday'
+data$days[data$weekday_is_friday == 1] <- 'friday'
+data$days[data$weekday_is_saturday == 1] <- 'saturday'
+data$days[data$weekday_is_sunday == 1] <- 'sunday'
+sum(is.na(data$days))
+
+data$days <- as.factor(data$days)
+drop_list5 <- c('weekday_is_monday', 
+                'weekday_is_tuesday', 
+                'weekday_is_wednesday', 
+                'weekday_is_thursday', 
+                'weekday_is_friday', 
+                'weekday_is_saturday', 
+                'weekday_is_sunday')
+data <- data[, !colnames(data) %in% drop_list5]
+```
+
+#### Summary of cleaned data
+```{r}
+str(data)
+#summary(data)
+```
+
+#### Create training set index for train/test set split
+
+```{r}
+train_size <- floor(0.75*nrow(data))
+set.seed(0)
+train_ind <- sample(nrow(data),size = train_size)
+```
+
+---
+
+### 2. **Regression**
+
+#### Split into train and test set
+```{r}
+rg_data <- data
+rg_train <- rg_data[train_ind,]
+rg_test <- rg_data[-train_ind,]
+```
+
+#### 2.1 Linear Regression (with no regularization)
+
+##### remove predictors with high VIF
+
+```{r}
+lm_fit <- lm(formula = shares ~ .-shares, data = rg_train)
+
+library(car)
+vif(lm_fit)
+vif_values <- data.frame(vif(lm_fit))
+highVIF_list <- row.names(vif_values)[which(vif_values$GVIF > 5)]
+vars <- paste(highVIF_list, collapse = '-')
+formula <- as.formula(paste('~.-',vars,collapse =''))
+lm_fit <- update(lm_fit, formula)
+#summary(lm_fit)
+```
+
+##### select predictors with high significance
+```{r}
+lm_anova <- anova(lm_fit)# anova table
+
+selected_vars_lm <- row.names(lm_anova)[which(lm_anova$`Pr(>F)` < 0.001)]
+vars <- paste(selected_vars_lm, collapse = '+')
+formula <- as.formula(paste('shares ~ ', vars, collapse = ''))
+lm_fit <- lm(formula, data=rg_train)
+summary(lm_fit)
+```
+
+##### calculate MSE
+```{r}
+(lm_MSE = mean((rg_test$shares - predict(lm_fit, newdata = rg_test))^2))
+```
+
+#### 2.2 Best Subset Selection 
+
+```{r}
+library(leaps)
+lmfit_full <- regsubsets(shares ~ .-shares, data = rg_train)
+(lmBestSS_summary <- summary(lmfit_full))
+
+#par(mfrow=c(2,2))
+#plot(lmBestSS_summary$rss, xlab="Number of Variables", ylab="RSS")
+#plot(lmBestSS_summary$adjr2, xlab="Number of Variables", ylab="Adjusted RSq", type="l")
+(best_model = which.max(lmBestSS_summary$adjr2))
+#points(best_model, lmBestSS_summary$adjr2[best_model], col="red", cex=2, pch=20)
+
+#plot(lmBestSS_summary$cp, xlab="Number of Variables", ylab="Cp", type="l")
+(best_model = which.min(lmBestSS_summary$cp))
+#points(best_model, lmBestSS_summary$cp[best_model], col="red", cex=2, pch=20)
+
+#plot(lmBestSS_summary$bic, xlab="Number of Variables", ylab="BIC", type="l")
+(best_model = which.min(lmBestSS_summary$bic))
+#points(best_model, lmBestSS_summary$bic[best_model], col="red", cex=2, pch=20)
+
+#coef(lmfit_full, id = best_model)
+```
+
+##### MSE 
+```{r}
+(lm_BestSS_MSE = lmBestSS_summary$rss[best_model]/nrow(rg_test))
+```
+
+#### 2.3 Ridge Regression
+
+```{r}
+library(glmnet)
+x <- model.matrix(shares ~ .-shares, data = rg_train)
+ridge_fit <- glmnet(x, rg_train$shares, alpha=0) 
+
+# Cross Validation to find the best lambda
+set.seed(0)
+ridge_cv <- cv.glmnet(x, rg_train$shares, alpha=0)
+
+ridge_fit <- glmnet(x,rg_train$shares,alpha=0, lambda=ridge_cv$lambda.min)
+
+ridge_test <- model.matrix(shares ~ .-shares, data = rg_test)
+ridge_pred <- predict(ridge_fit, ridge_test)
+
+```
+
+##### MSE 
+```{r}
+(ridge_MSE <- mean((rg_test$shares-ridge_pred)^2))
+```
+
+#### 2.4 LASSO Regression
+
+```{r}
+library(glmnet)
+x <- model.matrix(shares ~ .-shares, data = rg_train)
+lasso_fit <-glmnet(x, rg_train$shares, alpha = 1)
+
+# Cross Validation to find the best lambda
+set.seed(0)
+lasso_cv <- cv.glmnet(x, rg_train$shares, alpha=1)
+
+lambda_best <- lasso_cv$lambda.min
+lasso_fit <- glmnet(x,rg_train$shares, alpha = 1, lambda=lambda_best)
+
+lasso_test <- model.matrix(shares ~ .-shares, data = rg_test)
+lasso_pred <- predict(lasso_fit, lasso_test)
+
+```
+
+##### MSE 
+```{r}
+(lasso_MSE <- mean((rg_test$shares-lasso_pred)^2))
+```
+
+#### 2.5 ELastic Net 
+```{r}
+library(glmnet)
+x <- model.matrix(shares ~ .-shares, data = rg_train)
+a <- seq(0, 1, 0.05)
+
+# Cross Validation to find the best alpha and the corresponding best lambda
+search <- foreach(i = a, .combine = rbind) %dopar% {
+  cv <- cv.glmnet(x, rg_train$shares,  alpha = i)
+  data.frame(cvm = cv$cvm[cv$lambda == cv$lambda.min],
+             alpha = i,lambda.min = cv$lambda.min)
+}
+
+set.seed(0)
+elastic_cv <- search[search$cvm == min(search$cvm), ]
+
+elastic_fit <- glmnet(x, rg_train$shares, 
+                      lambda = elastic_cv$lambda.min, alpha = elastic_cv$alpha)
+
+elastic_test <- model.matrix(shares ~ .-shares, data = rg_test)
+elastic_pred <- predict(elastic_fit, elastic_test)
+
+```
+
+##### MSE 
+```{r}
+(elastic_MSE <- mean((rg_test$shares-elastic_pred)^2))
+```
+
+#### 2.6 Ridge regression with features selected by Lasso
+
+```{r}
+lasso_vars <- dimnames(coef(lasso_fit))[[1]][-c(1,2,39:50)] # first two elements are '(intercept)'
+vars <- paste(lasso_vars, collapse ='+')
+
+formula <- as.formula(paste('shares ~ channel+days+',vars,collapse =''))
+x <- model.matrix(formula, data = rg_train)
+
+lridge_fit <- glmnet(x, rg_train$shares, alpha=0) 
+
+set.seed(0)
+lridge_cv <- cv.glmnet(x, rg_train$shares, alpha=0)
+lridge_fit <- glmnet(x,rg_train$shares,alpha=0, lambda=lridge_cv$lambda.min)
+
+lridge_test <- model.matrix(formula, data = rg_test)
+lridge_pred <- predict(lridge_fit, lridge_test)
+
+```
+
+##### MSE 
+```{r}
+(lridge_MSE <- mean((rg_test$shares-lridge_pred)^2))
+```
+
+#### 2.7 Regression Trees
+
+```{r}
+library(tree)
+
+## Bagging
+library(randomForest)
+set.seed(0)
+rg_bagtree_fit <- randomForest(shares~., data=rg_train, 
+                               mtry= ncol(rg_train) - 1, 
+                               importance=TRUE, 
+                               ntree=300)
+#rg_bagtree_fit
+
+rg_bagtree_pred <- predict(rg_bagtree_fit, newdata=rg_test)
+(rg_bagtree_MSE <- mean((rg_bagtree_pred - rg_test$shares)^2))
+
+#importance(rg_bagtree_fit)
+#varImpPlot(rg_bagtree_fit)
+
+## Random Forest
+library(randomForest)
+set.seed(0)
+rg_rftree_fit <-randomForest(shares ~., data=rg_train, importance=TRUE, ntree = 300)
+#rg_rftree_fit
+
+rg_rftree_pred <- predict(rg_rftree_fit, newdata=rg_test)
+(rg_rftree_MSE <- mean((rg_rftree_pred - rg_test$shares)^2))
+
+#importance(rg_rftree_fit)
+#varImpPlot(rg_rftree_fit)
+
+## Boosting
+library(gbm)
+set.seed (0)
+rg_boost_fit <- gbm(shares ~ ., data = rg_train, distribution = "gaussian",
+                   n.trees = 300, interaction.depth = 3)
+#rg_boost_fit
+#summary(rg_boost_fit)
+
+rg_boost_pred <- predict(rg_boost_fit, newdata = rg_test, n.trees = 300)
+(rg_boost_MSE <-mean((rg_boost_pred  - rg_test$shares) ^ 2))
+
+```
+
+#### 2.8 principal component regression
+
+```{r}
+library(pls)
+pcr_fit <- pcr(shares ~ .-shares, data=rg_train, scale=TRUE, validation ="CV")
+summary(pcr_fit) 
+validationplot(pcr_fit ,val.type = "MSEP")
+```
+
+##### MSE 
+```{r}
+#RSS: we choose n_comp to be 33 because based on the PCR model 33 predictors explains over 95% of the variance of our target feature
+pcr_pred <- predict (pcr_fit,rg_test,ncomp = 33)
+(pcr_MSE <- mean((pcr_pred - rg_test$shares)^2))
+```
+
+
+#### 2.9 partial least squares
+
+```{r}
+library(pls)
+pls_fit<-plsr(shares ~ .-shares, data=rg_train, scale=TRUE , validation ="CV")
+summary (pls_fit)
+validationplot(pls_fit ,val.type="MSEP")
+# The cv MSE minimised at component 15.
+```
+
+##### MSE 
+```{r}
+pls_pred=predict (pls_fit ,rg_test,ncomp =15)
+(pls_MSE <- mean((pls_pred - rg_test$shares)^2))
+
+```
+
+
+---
+
+### 3. **Regression Models Evaluation**
+
+```{r}
+#Create columns for model and MSE
+model_names<-list(c('Linear Regression',
+                    'Best Subset Regression',
+                    'Ridge', 
+                    'LASSO',
+                    'Elastic Net', 
+                    'Ridge with features selected by LASSO',
+                    'Bagging', 
+                    'Random Forests', 
+                    'Boosting', 
+                    'Principle Component Regression', 
+                    'Partial Least Squares'))
+mse_lst <-list(c(lm_MSE,
+                 lm_BestSS_MSE,
+                 ridge_MSE, 
+                 lasso_MSE, 
+                 elastic_MSE,
+                 lridge_MSE,
+                 rg_bagtree_MSE, 
+                 rg_rftree_MSE, 
+                 rg_boost_MSE, 
+                 pcr_MSE, 
+                 pls_MSE))
+
+```
+
+```{r}
+#Create dataframe and order 
+reg_eval <- data.frame(model_names, mse_lst)
+colnames(reg_eval) <- c('Model', 'MSE')
+reg_eval <- reg_eval[order(reg_eval$MSE),] #orders data by MSE
+print(reg_eval)
+```
+
+```{r eval = FALSE}
+#output to csv file
+write.csv(reg_eval,'regression evaluation table.csv')
+```
+
+
+---
+
+### 4. **Classification**
+
+#### Split into train and test set
+
+```{r}
+cf_data <- subset(data, select = -c(shares))
+cf_data$pop <- ifelse(data$shares >= median(data$shares), "popular", "unpopular")
+cf_data$pop <- factor(cf_data$pop, levels = c("unpopular", "popular"), order = T)
+
+cf_train <- cf_data[train_ind,]
+cf_test <- cf_data[-train_ind,]
+```
+
+#### function for model evaluation
+```{r}
+library(pROC)
+library(caret)
+model_eva <- function(model_pred){
+  con = confusionMatrix(model_pred, cf_test$pop, positive ='popular')
+  accuracy <- con$overall[c('Accuracy')] 
+  precision <- con$byClass[c('Precision')]
+  recall <- con$byClass[c('Recall')]
+  F1 <- con$byClass[c('F1')]
+  model_eva <- data.frame(accuracy, precision, recall, F1, model_auc)
+  names(model_eva) <- c("Accuracy", "Precision", "Recall", "F1", "AUC")
+  model_eva
+}
+```
+
+#### 4.1 Logistic Regression 
+
+```{r}
+set.seed(0)
+glm_fit = glm(pop ~ ., data = cf_train, family = binomial)
+# summary(glm_fit) 
+glm_prob <- predict(object = glm_fit,newdata = cf_test,type = "response")  
+glm_pred <- ifelse(glm_prob >= 0.5, "popular", "unpopular")
+glm_pred <- factor(glm_pred, levels = c("unpopular", "popular"), order = T)
+
+glm_modelroc <- roc(cf_test$pop, glm_prob) 
+model_auc <- glm_modelroc$auc
+glm_eva <- model_eva(glm_pred)
+glm_eva
+```
+
+##### Stepwise Logistic Regression
+
+```{r}
+step_glm <- step(object = glm_fit,trace = 0)
+#summary(step_glm)
+step_prob <- predict(object = step_glm, newdata = cf_test, type = "response")
+step_pred <- ifelse(step_prob >= 0.5, "popular", "unpopular")
+step_pred <- factor(step_pred, levels = c("unpopular", "popular"), order = T)
+
+step_modelroc <- roc(cf_test$pop, step_prob) 
+model_auc <- step_modelroc$auc
+step_eva <- model_eva(step_pred)
+step_eva
+```
+
+#### 4.2 K Nearest neighbors
+
+##### preparation and normalization
+```{r}
+library(class)
+train_x <- model.matrix(pop~., cf_train)
+test_x <- model.matrix(pop~., cf_test)
+
+normalize <- function(x)
+{
+  return ((x-min(x))/(max(x)-min(x)))
+}
+
+knn_train <- apply(train_x[,-1], 2, normalize)
+knn_test <- apply(test_x[,-1], 2, normalize)
+```
+
+##### cross validation find the best k
+**Alert** code takes a long time to run. We only ran it once and would use the result directly
+```{r eval = FALSE}
+# split training set into validation set and training set for cross validation
+val_size <- floor(0.25*nrow(knn_train))
+set.seed(0)
+val_ind <- sample(nrow(knn_train),size = val_size)
+
+knn_val <- knn_train[val_ind,]
+knn_subtrain <- knn_train[-val_ind,]
+
+knn_val_pop <- cf_train[val_ind,]$pop
+knn_subtrain_pop <- cf_train[-val_ind,]$pop
+
+knn_ROC <- data.frame()
+for (i in seq(from =1, to =44, by =2)){
+  pop_hat <- knn(train = knn_subtrain, test = knn_val, cl = knn_subtrain_pop, k = i) 
+  require(caret)
+  con = confusionMatrix(pop_hat, knn_val_pop, positive='popular')
+  knn_accuracy <- con$overall[c('Accuracy')] 
+  knn_precision <- con$byClass[c('Precision')]
+  knn_recall <- con$byClass[c('Recall')]
+  knn_F1 <- con$byClass[c('F1')]
+  out <- data.frame(i, knn_accuracy, knn_precision, knn_recall, knn_F1)
+  knn_ROC <- rbind(knn_ROC,out)
+}
+names(knn_ROC) <- c("n","Accuracy","Precision","Recall","F1")
+rownames(knn_ROC) <- 1:nrow(knn_ROC)
+View(knn_ROC)
+## k=41 is the best  
+```
+
+##### with optimal k
+```{r}
+set.seed(0)
+knn_pred <- knn(train = knn_train, test = knn_test, cl = cf_train$pop, prob = T, k = 41)
+prob <- attr(knn_pred, "prob")
+knn_prob <- ifelse(knn_pred == "popular", prob, 1-prob)
+knn_pred <- factor(knn_pred, levels = c("unpopular", "popular"), order=T)
+
+knn_modelroc <- roc(cf_test$pop, knn_prob)
+model_auc <- knn_modelroc$auc
+
+knn_eva <- model_eva(knn_pred)
+knn_eva
+```
+
+
+#### 4.3 Classification trees with pruning
+
+```{r}
+set.seed(0)
+ctree_fit <- tree(pop ~ ., data = cf_train)
+#summary(ctree_fit)
+plot(ctree_fit)
+text(ctree_fit)
+
+ctree_pred <- predict(ctree_fit, cf_test, type="class")
+ctree_prob <- predict(ctree_fit, cf_test, type="vector")
+
+ctree_modelroc <- roc(cf_test$pop, ctree_prob[,1]) 
+model_auc <- ctree_modelroc$auc
+ctree_eva <- model_eva(ctree_pred)
+ctree_eva
+```
+
+##### prunning (misclassifciation rate)
+```{r}
+set.seed(0)
+ctree_cvm <- cv.tree(ctree_fit, FUN = prune.misclass)
+#ctree_cvm
+
+#par(mfrow=c(1,2))
+#plot(ctree_cvm$size, ctree_cvm$dev, type="b")
+#plot(ctree_cvm$k, ctree_cvm$dev, type="b")
+
+#par(mfrow=c(1,1))
+ptree_cvm <-prune.misclass(ctree_fit, best=2) #2 or 3 have the same dev
+#plot(ptree_cvm)
+#text(ptree_cvm, pretty=0)
+
+ptree_cvm_pred <-predict(ptree_cvm, cf_test, type="class")
+ptree_cvm_prob <- predict(ptree_cvm, cf_test, type="vector")
+
+ptree_cvm_modelroc <- roc(cf_test$pop, ptree_cvm_prob[,1]) 
+model_auc <- ptree_cvm_modelroc$auc
+ptree_cvm_eva <- model_eva(ptree_cvm_pred)
+ptree_cvm_eva
+
+```
+
+##### prunning (entropy)
+```{r}
+set.seed(0)
+ctree_cve <- cv.tree(ctree_fit, FUN = prune.tree)
+#par(mfrow=c(1,2))
+#plot(ctree_cve$size, ctree_cve$dev, type="b")
+#plot(ctree_cve$k, ctree_cve$dev, type="b")
+
+#par(mfrow=c(1,1))
+ptree_cve <-prune.misclass(ctree_fit, best=3) # 3 have the smallest dev
+#plot(ptree_cve)
+#text(ptree_cve, pretty=0)
+
+ptree_cve_pred <-predict(ptree_cve, cf_test, type="class")
+ptree_cve_prob <- predict(ptree_cve, cf_test, type="vector")
+
+ptree_cve_modelroc <- roc(cf_test$pop, ptree_cve_prob[,1]) 
+model_auc <- ptree_cve_modelroc$auc
+ptree_cve_eva <- model_eva(ptree_cve_pred)
+ptree_cve_eva
+```
+
+
+#### 4.4 Bagging 
+
+```{r}
+library(randomForest)
+set.seed(0)
+bagtree_fit <- randomForest(pop~., data=cf_train, mtry= ncol(cf_train) - 1, 
+                            importance=TRUE, ntree=300)
+#bagtree_fit
+#importance(bagtree_fit)
+#varImpPlot(bagtree_fit)
+
+bagtree_prob <- predict(bagtree_fit, newdata = cf_test, type = "prob")
+bagtree_pred <- predict(bagtree_fit, newdata=cf_test)
+bagtree_pred <- factor(bagtree_pred,level = c("unpopular","popular"), order = T)
+
+bagtree_modelroc <- roc(cf_test$pop, bagtree_prob[,1]) 
+model_auc <- bagtree_modelroc$auc
+
+bagtree_eva <- model_eva(bagtree_pred)
+bagtree_eva 
+
+```
+
+
+#### 4.5 Random Forest
+
+```{r}
+library(randomForest)
+set.seed(0)
+rftree_fit <-randomForest(pop~., data=cf_train, importance=TRUE, ntree = 300)
+#rftree_fit
+#importance(rftree_fit)
+#varImpPlot(rftree_fit)
+
+rftree_prob <- predict(rftree_fit, newdata = cf_test, type = "prob")
+rftree_pred <- predict(rftree_fit, newdata = cf_test)
+rftree_pred <- factor(rftree_pred,level = c("unpopular","popular"), order = T)
+
+rf_modelroc <- roc(cf_test$pop, rftree_prob[,1]) 
+model_auc <- rf_modelroc$auc
+
+rf_eva <- model_eva(rftree_pred)
+rf_eva 
+```
+
+#### 4.6 Generalized Boosting Model
+
+```{r}
+library(gbm)
+library(caret)
+
+predictorsNames <- names(cf_data[,!names(cf_data) %in% c('pop')])
+
+objControl <- trainControl(method='cv', number=5, returnResamp='none', 
+                           summaryFunction = twoClassSummary, classProbs = TRUE)
+set.seed(0)
+gradtree_fit <- train(cf_train[,predictorsNames], cf_train$pop, method='gbm',
+                      trControl=objControl, metric = "ROC", preProc = c("center", "scale"),
+                      verbose=F)
+
+gratree_pred <- predict(object=gradtree_fit, cf_test[,predictorsNames], type='raw')
+gratree_prob <- predict(object=gradtree_fit, cf_test[,predictorsNames], type='prob')
+
+gratree_modelroc <- roc(cf_test$pop, gratree_prob[,1]) 
+model_auc <- gratree_modelroc$auc
+gratree_eva <- model_eva(gratree_pred)
+gratree_eva 
+```
+
+#### 4.7 Adaptive Boosting
+
+```{r}
+library(adabag)
+cf_train$pop <- factor(cf_train$pop, order = FALSE)
+set.seed(0)
+ada_fit <- boosting(pop ~., data = cf_train, boos = TRUE, mfinal = 100)
+
+ada_pred <- predict(ada_fit, cf_test)
+ada_prob <- ada_pred$prob[,1]
+ada_pred <- factor(ada_pred$class, level = c("unpopular","popular"), order = T)
+
+ada_modelroc <- roc(cf_test$pop, ada_prob) 
+model_auc <- ada_modelroc$auc
+ada_eva <- model_eva(ada_pred)
+ada_eva
+
+```
+
+
+#### 4.8 Adaptive Boosting
+
+##### preparation and CV to get the best "nrounds"
+```{r}
+library(xgboost)
+# prepare data for xgboost: all predictors (and response) need to be numeric
+
+xgb_data <- cf_data
+xgb_data$channel <- as.numeric(cf_data$channel)-1
+xgb_data$days <- as.numeric(cf_data$days) - 1
+xgb_data$pop <- as.numeric(cf_data$pop) - 1 
+
+xgb_train <- xgb_data[train_ind,]
+xgb_test <- xgb_data[-train_ind,]
+
+# split the training set into sub-train and validation set for tunning
+val_size <- floor(0.25*nrow(xgb_train))
+set.seed(0)
+val_ind <- sample(nrow(xgb_train),size = val_size)
+
+xgb_val <- xgb_train[val_ind,]
+xgb_subtrain <- xgb_train[-val_ind,]
+
+predictorsNames <- names(xgb_data[,!names(xgb_data) %in% c('pop')])
+
+new_tr <- model.matrix(~.+0,data = xgb_train[,predictorsNames]) 
+new_subtr <- model.matrix(~.+0, data = xgb_subtrain[,predictorsNames])
+new_val <- model.matrix(~.+0, data = xgb_val[,predictorsNames])
+new_ts <- model.matrix(~.+0,data = xgb_test[,predictorsNames])
+
+dtrain <- xgb.DMatrix(data=new_tr, label = xgb_train$pop)
+dsubtrain <- xgb.DMatrix(data=new_subtr, label = xgb_subtrain$pop)
+dval <- xgb.DMatrix(data=new_val, label = xgb_val$pop)
+dtest <- xgb.DMatrix(data=new_ts, label = xgb_test$pop)
+
+params <- list(booster = "gbtree", objective = "binary:logistic", 
+               eta=0.3, lambda = 1, gamma=1, max_depth=6, min_child_weight=1, 
+               subsample=1, colsample_bytree=1) # default parameters
+
+# cv to get best nrounds
+set.seed(0)
+xgbcv <- xgb.cv(params = params, data = dtrain, nrounds= 200, nfold = 5,
+                showsd = T, stratified = T, print.every.n=10, early.stop.round=50, maximize=F)
+```
+
+##### first default - model training
+```{r}
+xgb1 <- xgb.train (params = params, data = dtrain, 
+                   nrounds = xgbcv$best_iteration, 
+                   watchlist = list(train=dsubtrain,val=dval), 
+                   print.every.n = 10, early.stop.round = 50, 
+                   maximize = F , eval_metric = "error")
+
+#importance <- xgb.importance (feature_names = colnames(new_tr),model = xgb1)
+#xgb.plot.importance (importance_matrix = importance[1:10])
+
+xgbprob1 <- predict (xgb1,dtest)
+xgbpred1 <- ifelse (xgbprob1 > 0.5, "popular", "unpopular")
+xgbpred1 <- factor(xgbpred1,level = c("unpopular","popular"), order = T)
+
+xgb_modelroc <- roc(cf_test$pop, xgbprob1) 
+model_auc <- xgb_modelroc$auc
+xgb_eva <- model_eva(xgbpred1)
+xgb_eva 
+```
+
+##### Tunning parameters 
+**ALERT** code takes hours to run. We ran it once and would use the results directly.
+
+Results: nrounds: ~201; max_depth: 2-3; eta: 0.1-0.2; gamma = 1
+
+```{r eval = FALSE}
+library(mlr)
+library(caret)
+getParamSet('classif.xgboost') 
+# see which parameters can we tune
+# nrounds: number of trees in the model/maximum number of iterations
+# max_depth: number of splits in each tree
+# eta - controls learning rate, lower eta -- lower computation
+# gamma: regularization
+xgb_params <- makeParamSet(makeIntegerParam("nrounds", lower = 100, upper = 500),
+                           makeIntegerParam("max_depth", lower = 1, upper = 10),
+                           makeNumericParam("eta", lower = .1, upper = .3),
+                           makeNumericParam('gamma', lower = 0, upper = 2))
+xgb_control <- makeTuneControlGrid()
+xgb_resample_desc <- makeResampleDesc('CV', iters = 5)
+xgb_learner <- makeLearner("classif.xgboost", predict.type = "response",
+                           par.vals = list(objective = "binary:logistic",
+                                           eval_metric = "error",nrounds = 100))
+xgb_train$pop <- cf_train$pop
+trainTask <- makeClassifTask(data = xgb_train, target = 'pop',positive = 'popular')
+
+
+set.seed(0)
+xgb_tuned_params <- tuneParams(learner = xgb_learner, 
+                               task = trainTask, resampling = xgb_resample_desc,
+                               par.set = xgb_params, control = xgb_control)
+
+xgb_train$pop <- as.numeric(cf_train$pop)-1
+
+#params2 <- list(booster = "gbtree", objective = "binary:logistic", 
+#                eta=xgb_tuned_params$x$eta, gamma=xgb_tuned_params$x$gamma, 
+#                max_depth=xgb_tuned_params$x$max_depth, 
+#                lambda = xgb_tuned_params$x$lambda,
+#                min_child_weight=1, subsample=1, colsample_bytree=1)
+```
+
+#### xgboost with tunned parameters
+```{r}
+library(xgboost)
+
+params2 <- list(booster = "gbtree", objective = "binary:logistic", 
+                eta=0.144, gamma=1, 
+                max_depth=3, alpha = 0,
+                min_child_weight=1, subsample=1, colsample_bytree=1)
+
+set.seed(0)
+xgb2 <- xgb.train (params = params2, data = dtrain, 
+                   nrounds = 201, 
+                   watchlist = list(train=dsubtrain,val=dval), 
+                   print.every.n = 10, early.stop.round = 20, 
+                   maximize = F , eval_metric = "error")
+
+importance <- xgb.importance (feature_names = colnames(new_tr),model = xgb2)
+xgb.plot.importance (importance_matrix = importance[1:10])
+
+xgbprob2 <- predict (xgb2,dtest)
+xgbpred2 <- ifelse (xgbprob2 > 0.5, "popular", "unpopular")
+xgbpred2 <- factor(xgbpred2,level = c("unpopular","popular"), order = T)
+
+xgb2_modelroc <- roc(cf_test$pop, xgbprob2) 
+model_auc <- xgb2_modelroc$auc
+xgb2_eva <- model_eva(xgbpred2)
+xgb2_eva 
+
+```
+
+**End of code** 

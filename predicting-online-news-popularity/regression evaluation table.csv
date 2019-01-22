@@ -1,0 +1,9 @@
+"","Model","MSE"
+"4","LASSO",47106651.5440349
+"5","Elastic Net",47109310.8361391
+"3","Ridge",47199789.6573604
+"6","Ridge with features selected by LASSO",47204218.3055626
+"8","Partial Least Squares",47312545.2159628
+"7","Principle Component Regression",47333012.7864
+"1","Linear Regression",47841967.7155504
+"2","Best Subset Regression",485575018.463433
