@@ -15,4 +15,4 @@ Among our classication models, Extreme Gradient Boosting has the highest predic
 With several data cleaning and parameter tuning techniques, our classification models beat the best performance
 of models (67%) used by the original authors of the dataset.
 
-![Table 2](https://github.com/nicole-hjlin/data-science/blob/master/predicting-online-news-popularity/tables/classification performances.jpg)
+![Table 2](https://github.com/nicole-hjlin/data-science/blob/master/predicting-online-news-popularity/tables/classification%20performances.jpg)
