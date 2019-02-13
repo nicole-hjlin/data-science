@@ -1,6 +1,6 @@
 # Misinformation Diffusion on Twitter Network during the 2016 US Election
 ---
-__This is my capstone project for MSc Data Science at the LSE, in collaboration with Qiang Ha 
+__This is my capstone project for the MSc Data Science at the LSE, in collaboration with Qiang Ha 
 (another student in the program) and partnership with [Pablo Barbera](http://pablobarbera.com/) 
 from the department of Methodology at the LSE.__
 
