@@ -9,4 +9,4 @@ This project aims to compare the spread of fake news and true news on both the n
 news from true news. Using these features, we will use machine learning techniques to identify fake news and
 evaluate prediction accuracy of different models.
 
-**Work in progress**
+**\*Work in progress**
