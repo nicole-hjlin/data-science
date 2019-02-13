@@ -10,7 +10,7 @@ itory](https://archive.ics.uci.edu/ml/datasets/Online+News+Popularity) to predic
 ## Main results
 Among our regression models, LASSO has the best predictive performance, with an MSE of 47,106,651.
 
-![Table 1]('./tables/regression performances.jpg')
+![Table 1]('/tables/regression performances.jpg')
 
 Among our classication models, Extreme Gradient Boosting has the highest prediction accuracy of 68.25%.
 With several data cleaning and parameter tuning techniques, our classification models beat the best performance
