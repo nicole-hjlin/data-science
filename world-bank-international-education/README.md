@@ -6,7 +6,7 @@ _This report is work in progress and your feedback will be highly appreciated. Y
 
 ## IMPORTANT NOTE
 _report.ipynb_ contains interactive plots that cannot be shown in github browser yet. 
-- Please **click the following link** for the final report that displays all plots properly: [https://nbviewer.jupyter.org/github/nicole-hjlin/exploratory-data-analysis/blob/master/world-bank-international-education/report.ipynb](https://nbviewer.jupyter.org/github/nicole-hjlin/exploratory-data-analysis/blob/master/world-bank-international-education/report.ipynb)
+- Please **click the following link** for the final report that displays all plots properly: [https://nbviewer.jupyter.org/github/nicole-hjlin/data-science/blob/master/world-bank-international-education/report.ipynb](https://nbviewer.jupyter.org/github/nicole-hjlin/data-science/blob/master/world-bank-international-education/report.ipynb)
 - Alternatively, pull the whole repo and run the jupyter notebook locally. 
 
 ---
